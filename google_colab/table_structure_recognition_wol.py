@@ -1,179 +1,175 @@
 import cv2
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-import csv
-
-from google.colab.patches import cv2_imshow
-
-try:
-    from PIL import Image
-except ImportError:
-    import Image
 import pytesseract as tess
-import pytesseract
-
 
 def recognize_structure(img):
-    #tess.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
-
-    #print(img.shape)
+    # Convert image to grayscale
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img_height, img_width = img.shape
 
-    #print("img_height", img_height, "img_width", img_width)
+    # Display the grayscale image
+    plt.figure(figsize=(10, 10))
+    plt.title("Grayscale Image")
+    plt.imshow(img, cmap='gray')
+    plt.axis('off')
+    plt.show()
 
-    cv2_imshow(img)
-
-    # thresholding the image to a binary image
-    # thresh, img_bin = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # Apply adaptive thresholding to get binary image
     img_bin = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 5, 5)
 
-    cv2_imshow(img_bin)
+    # Display binary image
+    plt.figure(figsize=(10, 10))
+    plt.title("Binary Image")
+    plt.imshow(img_bin, cmap='gray')
+    plt.axis('off')
+    plt.show()
 
-
+    # Apply median blur to reduce noise
     img_median = cv2.medianBlur(img_bin, 3)
-  
-    cv2_imshow(img_median)
-  
 
-    ver_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, img_height*2)) #shape (kernel_len, 1) inverted! xD
+    # Display median blurred image
+    plt.figure(figsize=(10, 10))
+    plt.title("Median Blurred Image")
+    plt.imshow(img_median, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+    # Define kernels for vertical and horizontal line detection
+    ver_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, img_height * 2))
     vertical_lines = cv2.erode(img_median, ver_kernel, iterations=1)
-    cv2_imshow(vertical_lines)
 
-    hor_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (img_width*2, 9)) #shape (kernel_len, 1) inverted! xD
+    # Display vertical lines
+    plt.figure(figsize=(10, 10))
+    plt.title("Vertical Lines")
+    plt.imshow(vertical_lines, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+    hor_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (img_width * 2, 9))
     horizontal_lines = cv2.erode(img_median, hor_kernel, iterations=1)
-    cv2_imshow(horizontal_lines)
 
-    # A kernel of 2x2
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-    #print(kernel)
-    #print(kernel.shape)
+    # Display horizontal lines
+    plt.figure(figsize=(10, 10))
+    plt.title("Horizontal Lines")
+    plt.imshow(horizontal_lines, cmap='gray')
+    plt.axis('off')
+    plt.show()
 
-    # Combine horizontal and vertical lines in a new third image, with both having same weight.
+    # Combine horizontal and vertical lines
     img_vh = cv2.addWeighted(vertical_lines, 0.5, horizontal_lines, 0.5, 0.0)
-    cv2_imshow(img_vh)
-
-    cv2_imshow(~img_vh)
-
-    # Eroding and thesholding the image
-    img_vh = cv2.erode(~img_vh, kernel, iterations=2)
-    cv2_imshow(img_vh)
-
-    thresh, img_vh = cv2.threshold(img_vh, 128, 255, cv2.THRESH_BINARY )
     
-    cv2_imshow(img_vh)
-    
+    # Display combined lines
+    plt.figure(figsize=(10, 10))
+    plt.title("Combined Lines")
+    plt.imshow(img_vh, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+    img_vh_inverted = ~img_vh
+    # Display inverted combined lines
+    plt.figure(figsize=(10, 10))
+    plt.title("Inverted Combined Lines")
+    plt.imshow(img_vh_inverted, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+    # Erode and threshold the combined lines image
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    img_vh = cv2.erode(img_vh_inverted, kernel, iterations=2)
+    _, img_vh = cv2.threshold(img_vh, 128, 255, cv2.THRESH_BINARY)
+
+    # Display the thresholded image
+    plt.figure(figsize=(10, 10))
+    plt.title("Thresholded Image")
+    plt.imshow(img_vh, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+    # Perform bitwise XOR and NOT operations
     bitxor = cv2.bitwise_xor(img, img_vh)
     bitnot = cv2.bitwise_not(bitxor)
-    # Plotting the generated image
-    cv2_imshow(bitnot)
 
-    # Detect contours for following box detection
+    # Display the result of bitwise NOT operation
+    plt.figure(figsize=(10, 10))
+    plt.title("Bitwise NOT Result")
+    plt.imshow(bitnot, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+    # Detect contours for box detection
     contours, hierarchy = cv2.findContours(img_vh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    #print(len(contours))
-    #print(contours[0])
-    #print(len(contours[0]))
-    #print(cv2.boundingRect(contours[0]))
 
     def sort_contours(cnts, method="left-to-right"):
-        # initialize the reverse flag and sort index
         reverse = False
         i = 0
-        # handle if we need to sort in reverse
         if method == "right-to-left" or method == "bottom-to-top":
             reverse = True
-        # handle if we are sorting against the y-coordinate rather than
-        # the x-coordinate of the bounding box
         if method == "top-to-bottom" or method == "bottom-to-top":
             i = 1
-        # construct the list of bounding boxes and sort them from top to
-        # bottom
         boundingBoxes = [cv2.boundingRect(c) for c in cnts]
-        (cnts, boundingBoxes) = zip(*sorted(zip(cnts, boundingBoxes),
-                                            key=lambda b: b[1][i], reverse=reverse))
-        # return the list of sorted contours and bounding boxes
+        (cnts, boundingBoxes) = zip(*sorted(zip(cnts, boundingBoxes), key=lambda b: b[1][i], reverse=reverse))
         return (cnts, boundingBoxes)
 
-
-    # Sort all the contours by top to bottom.
+    # Sort contours by top to bottom
     contours, boundingBoxes = sort_contours(contours, method="top-to-bottom")
 
-    # Creating a list of heights for all detected boxes
+    # Create a list of heights for detected boxes
     heights = [boundingBoxes[i][3] for i in range(len(boundingBoxes))]
-
-    # Get mean of heights
     mean = np.mean(heights)
 
-    # Create list box to store all boxes in
+    # Create list box to store all boxes
     box = []
-    # Get position (x,y), width and height for every contour and show the contour on image
-    #print("lencontours", len(contours))
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
-        #print("x", x, "y", y, "w", w, "h", h)
-        if (w < 0.9*img_width and h < 0.9*img_height):
-            image = cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        if (w < 0.9 * img_width and h < 0.9 * img_height):
+            img = cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
             box.append([x, y, w, h])
 
-    #cv2_imshow(image)
+    # Display the boxes on the image
+    plt.figure(figsize=(10, 10))
+    plt.title("Detected Boxes")
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    plt.show()
 
-    # Creating two lists to define row and column in which cell is located
+    # Sorting the boxes into rows and columns
     row = []
     column = []
-    j = 0
-
-    #print("len box", len(box))
-    # Sorting the boxes to their respective row and column
     for i in range(len(box)):
-        if (i == 0):
+        if i == 0:
             column.append(box[i])
             previous = box[i]
-
         else:
-            if (box[i][1] <= previous[1] + mean / 2):
+            if box[i][1] <= previous[1] + mean / 2:
                 column.append(box[i])
                 previous = box[i]
-
-                if (i == len(box) - 1):
+                if i == len(box) - 1:
                     row.append(column)
-
             else:
                 row.append(column)
                 column = []
                 previous = box[i]
                 column.append(box[i])
 
-    #print(column)
-    #print(row)
-
-    # calculating maximum number of cells
+    # Calculate maximum number of columns
     countcol = 0
     index = 0
     for i in range(len(row)):
         current = len(row[i])
-        #print("len",len(row[i]))
         if current > countcol:
             countcol = current
             index = i
 
-    #print("countcol", countcol)
-
-    # Retrieving the center of each column
-    #center = [int(row[i][j][0] + row[i][j][2] / 2) for j in range(len(row[i])) if row[0]]
+    # Retrieve the center of each column
     center = [int(row[index][j][0] + row[index][j][2] / 2) for j in range(len(row[index]))]
-    #print("center",center)
-
     center = np.array(center)
     center.sort()
-    #print("center.sort()", center)
-    # Regarding the distance to the columns center, the boxes are arranged in respective order
 
+    # Arrange boxes in respective order
     finalboxes = []
     for i in range(len(row)):
-        lis = []
-        for k in range(countcol):
-            lis.append([])
+        lis = [[] for _ in range(countcol)]
         for j in range(len(row[i])):
             diff = abs(center - (row[i][j][0] + row[i][j][2] / 4))
             minimum = min(diff)

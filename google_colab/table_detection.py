@@ -1,37 +1,33 @@
 import cv2
-from google.colab.patches import cv2_imshow
 import numpy as np
+import matplotlib.pyplot as plt
 
 def plot_prediction(img, predictor):
-    
     outputs = predictor(img)
 
-    # Blue color in BGR 
-    color = (255, 0, 0) 
-  
-    # Line thickness of 2 px 
+    # Blue color in BGR
+    color = (255, 0, 0)
+    # Line thickness of 2 px
     thickness = 2
 
-    for x1, y1, x2, y2 in outputs["instances"].get_fields()["pred_boxes"].tensor.to("cpu").numpy():
-        # Start coordinate 
-        # represents the top left corner of rectangle 
-        start_point = int(x1), int(y1) 
-  
-        # Ending coordinate
-        # represents the bottom right corner of rectangle 
-        end_point = int(x2), int(y2) 
-  
-        # Using cv2.rectangle() method 
-        # Draw a rectangle with blue line borders of thickness of 2 px 
-        img = cv2.rectangle(np.array(img, copy=True), start_point, end_point, color, thickness)
+    img_copy = np.array(img, copy=True)  # Make a copy of the image for drawing
 
-    # Displaying the image
-    print("TABLE DETECTION:")  
-    cv2_imshow(img)
+    for x1, y1, x2, y2 in outputs["instances"].get_fields()["pred_boxes"].tensor.to("cpu").numpy():
+        # Start coordinate (top-left corner)
+        start_point = int(x1), int(y1)
+        # Ending coordinate (bottom-right corner)
+        end_point = int(x2), int(y2)
+        # Draw a rectangle with blue line borders of thickness 2 px
+        cv2.rectangle(img_copy, start_point, end_point, color, thickness)
+
+    # Displaying the image using matplotlib
+    print("TABLE DETECTION:")
+    plt.imshow(cv2.cvtColor(img_copy, cv2.COLOR_BGR2RGB))  # Convert BGR to RGB for correct color display
+    plt.title("Detection")
+    plt.axis('off')  # Hide axis
+    plt.show()
 
 def make_prediction(img, predictor):
-    
-    #img = cv2.imread(img_path)
     outputs = predictor(img)
 
     table_list = []
@@ -39,10 +35,15 @@ def make_prediction(img, predictor):
 
     for i, box in enumerate(outputs["instances"].get_fields()["pred_boxes"].tensor.to("cpu").numpy()):
         x1, y1, x2, y2 = box
-        table_list.append(np.array(img[int(y1):int(y2), int(x1):int(x2)], copy=True))
-        table_coords.append([int(x1),int(y1),int(x2-x1),int(y2-y1)])
+        table_img = np.array(img[int(y1):int(y2), int(x1):int(x2)], copy=True)
+        table_list.append(table_img)
+        table_coords.append([int(x1), int(y1), int(x2 - x1), int(y2 - y1)])
         print("TABLE", i, ":")
-        cv2_imshow(img[int(y1):int(y2), int(x1):int(x2)])
+        # Display the table image using matplotlib
+        plt.imshow(cv2.cvtColor(table_img, cv2.COLOR_BGR2RGB))  # Convert BGR to RGB for correct color display
+        plt.title(f"Table {i}")
+        plt.axis('off')  # Hide axis
+        plt.show()
         print()
 
     return table_list, table_coords
