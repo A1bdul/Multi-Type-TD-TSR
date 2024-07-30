@@ -182,21 +182,18 @@ def recognize_structure(img):
     heights = [boundingBoxes[i][3] for i in range(len(boundingBoxes))]
     mean = np.mean(heights)
 
-    # Initialize the image variable
-    image = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
     box = []
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         if (w < 0.9 * img_width and h < 0.9 * img_height):
-            image = cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            image = cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
             box.append([x, y, w, h])
 
-    plt.figure(figsize=(8, 6))
-    plt.title("Detected Boxes")
-    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))  # Convert BGR to RGB for matplotlib
-    plt.axis('off')
-    plt.show()
+            plt.figure(figsize=(8, 6))
+            plt.title("Detected Boxes")
+            plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))  # Convert BGR to RGB for matplotlib
+            plt.axis('off')
+            plt.show()
 
     # Creating two lists to define row and column in which cell is located
     row = []
